@@ -1,0 +1,33 @@
+# Security (CRITICAL: Never push API keys)
+.env
+
+# Python Cache & Environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ipynb_checkpoints/
+
+# Heavy Data (Kaggle datasets, parquet, csv)
+data/
+!data/.gitkeep
+
+
+# Generated Outputs & Images
+images/
+!images/.gitkeep
+!images/generated_concepts/.gitkeep
+agent_architecture_graph.png
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

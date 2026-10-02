@@ -5,12 +5,13 @@ Corporate Data Science Pipeline: Retail Forecasting and Generative Concept Desig
 from src.forecaster import SalesForecaster
 from src.concept_generator import HFDiffusionConceptGenerator
 import pandas as pd
+from pathlib import Path
 
 # ==========================================
 # Task Orchestration Configurations
 # ==========================================
 # TURN THIS TO TRUE when ready to call Hugging Face API
-TASK_2_ENABLED = False
+TASK_2_ENABLED = True
 
 # Data & Model Locations
 DATA_DIR = "data/processed"
@@ -42,7 +43,6 @@ _NEGATIVE_PROMPT = (
 
 def _build_design_prompt(product_type: str, color: str) -> str:
     """Combines metadata traits, master style, and explicit design upgrades."""
-    # Lookup specific design upgrade (fallback to generic solid text)
     design_delta = _SPECIFIC_DESIGN_CHANGES.get(product_type, f"Solid {color} high-quality fabric construction.")
     full_prompt = f"Genuinely new next-season clothing concept for a {color} {product_type}. {design_delta} {_MASTER_STYLE}"
     return full_prompt
@@ -57,7 +57,7 @@ def main():
     # ==========================================
     pipeline_engine = SalesForecaster(models_dir=MODELS_DIR)
     
-    # 1A. Evaluate metrics on unit scale (Restore R2 Score view)
+    # 1A. Evaluate metrics on unit scale
     metrics = pipeline_engine.evaluate_performance(processed_data_dir=DATA_DIR)
     print("\n=== Subtask 1 Metrics (Unit Volume Scale) ===")
     print(f"  MAE:  {metrics['mae']:.2f} garments")
@@ -92,24 +92,35 @@ def main():
     for idx, row in winners.iterrows():
         p_type = row["product_type_name"]
 
-        # Skip small commodities like socks for the design phase
         if "sock" in p_type.lower():
             print(f"\nINFO: Skipping {p_type} for generative design.")
             continue
             
         color = row["colour_group_name"]
+        demographic = row.get("index_name", "general")
+        article_id = str(row["article_id"]).zfill(10)
         
-        # Build specific prompt
         final_prompt = _build_design_prompt(p_type, color)
-        safe_filename = f"concept_{idx+1}_{p_type.replace(' ', '_').lower()}_{color.lower()}"
+        
+        demo_clean = str(demographic).lower().replace(',', '').replace('/', '_').replace(' ', '_')
+        color_clean = str(color).lower().replace(',', '').replace('/', '_').replace(' ', '_')
+        type_clean = str(p_type).lower().replace(',', '').replace('/', '_').replace(' ', '_')
+        
+        stakeholder_filename = f"{demo_clean}_{color_clean}_{type_clean}"
+        
+        concepts_dir = Path("images/task2/concepts")
+        originals_dir = Path("images/task2/originals")
+        target_original_path = originals_dir / f"{article_id}.jpg"
+        target_concept_path = concepts_dir / f"{stakeholder_filename}.png"
         
         print(f"\nWinner {idx+1} Concept ({p_type}):")
-        print(f"  > Final Design Prompt: {final_prompt[:200]}...") # truncate for display
+        print(f"  > Reference Original: {target_original_path.as_posix()}")
+        print(f"  > Target Concept:     {target_concept_path.as_posix()}")
+        print(f"  > Final Design Prompt: {final_prompt[:200]}...") 
         
-        # Execute guarded API call
         if TASK_2_ENABLED and design_generator:
             try:
-                design_generator.generate_concept(final_prompt, _NEGATIVE_PROMPT, safe_filename)
+                design_generator.generate_concept(final_prompt, _NEGATIVE_PROMPT, stakeholder_filename)
             except Exception as call_err:
                 print(f"  ❌ Error generating Winner {idx+1}: {call_err}")
         elif not TASK_2_ENABLED:

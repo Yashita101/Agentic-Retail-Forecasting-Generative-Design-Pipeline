@@ -5,9 +5,17 @@ Interactive CLI for Task 3 Agentic Workflow.
 import os
 import sys
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from langchain_core.messages import HumanMessage
 from src.agents import merchmix_agent
 
+# ==========================================
+# Task Orchestration Configurations
+# ==========================================
+# TURN THIS TO "True" when ready to call Hugging Face API for Task 3
+os.environ["TASK_3_ENABLED"] = "False"
 
 def display_graph():
     """Renders the state node graph."""
@@ -66,7 +74,7 @@ def main():
 
     initial_state = {"messages": [HumanMessage(content=user_query)]}
 
-    # Stream execution across nodes (Orchestrator -> Data Sub-Agent -> Design Sub-Agent -> Presentation Assembly)
+    # Stream execution across nodes
     for output in merchmix_agent.stream(initial_state):
         for node_name, state_update in output.items():
             if "messages" in state_update:

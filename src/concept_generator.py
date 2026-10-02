@@ -17,7 +17,7 @@ class BaseConceptGenerator(ABC):
     Abstract interface for fashion concept generation to ensure loose coupling
     between orchestration (main) and specific generative backends.
     """
-    def __init__(self, output_dir: str | Path = "images/concepts") -> None:
+    def __init__(self, output_dir: str | Path = "images/task2/concepts") -> None:
         """Configures the output directory for generated imagery."""
         self._output_dir = Path(output_dir)
 
@@ -34,7 +34,7 @@ class HFDiffusionConceptGenerator(BaseConceptGenerator):
     Hugging Face inference engine utilizing Stable Diffusion for fashion text-to-image.
     Injects professional catalog aesthetics into generated outputs.
     """
-    # Champion model optimized for high-fidelity photorealistic fashion outputs
+
     _DEFAULT_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
 
     def __init__(self, model_id: str = _DEFAULT_MODEL) -> None:
@@ -70,7 +70,6 @@ class HFDiffusionConceptGenerator(BaseConceptGenerator):
         print(f"Subtask 2: Calling HF API via model {self._model_id}...")
         
         try:
-            # 1024x1024 is strictly required for SDXL to prevent collage/sketch outputs
             image: Image.Image = self._client.text_to_image(
                 prompt=prompt,
                 negative_prompt=neg_prompt,

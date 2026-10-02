@@ -7,9 +7,33 @@ from src.forecaster import SalesForecaster
 from src.concept_generator import HFDiffusionConceptGenerator
 from pathlib import Path
 
+# --- GRACEFUL INITIALIZATION & DRY RUN SAFETY NET ---
+TASK_3_ENABLED = os.environ.get("TASK_3_ENABLED", "False").lower() == "true"
+
 # Initialize core engines for Agent Use
 forecaster = SalesForecaster(models_dir="models")
-generator = HFDiffusionConceptGenerator()
+
+if TASK_3_ENABLED:
+    try:
+        generator = HFDiffusionConceptGenerator()
+        AGENT_GENERATION_ENABLED = True
+    except ValueError as e:
+        print("\n" + "="*60)
+        print("⚠️  [ENVIRONMENT CONFIGURATION MISSING]")
+        print(f"Details: {e}")
+        print("Action : Please add your 'HF_TOKEN' to the .env file to enable image generation.")
+        print("Status : The Agent will continue in DRY RUN mode (simulating API calls).")
+        print("="*60 + "\n")
+        generator = None
+        AGENT_GENERATION_ENABLED = False
+    except ImportError as e:
+        print(f"\n⚠ [DEPENDENCY MISSING]: {e}\nAgent will simulate generation.")
+        generator = None
+        AGENT_GENERATION_ENABLED = False
+else:
+    # Explicitly bypass initialization if the user sets it to False
+    generator = None
+    AGENT_GENERATION_ENABLED = False
 
 # ==========================================
 # MCP SCHEMAS (Strict typing for Agent tools)
@@ -34,7 +58,7 @@ def forecast_seasonal_styles(season: str) -> list[dict]:
     
     all_preds = forecaster.predict_top_performers(processed_data_dir="data/processed", limit_distinct=1000)
 
-    # 1. Standardized 4-season taxonomy mapped strictly to your H&M unique categories
+    # 1. Standardized 4-season taxonomy mapped to the H&M categories
     SEASON_RULES = {
         "winter": {
             "sweater": 3, "cardigan": 3, "coat": 3, "hoodie": 2, "jacket": 2, 
@@ -76,7 +100,7 @@ def forecast_seasonal_styles(season: str) -> list[dict]:
 
     all_preds["season_score"] = all_preds.apply(score_row, axis=1)
 
-    # 2. Aggressively exclude homeware, toys, cosmetics, and basic intimates
+    # 2. Exclude basic intimates
     excluded_items = {
         'accessories set', 'alice band', 'baby bib', 'bag', 'backpack', 'bracelet', 
         'bra', 'bra extender', 'bumbag', 'chem. cosmetics', 'clothing mist', 'cushion', 
@@ -103,7 +127,7 @@ def forecast_seasonal_styles(season: str) -> list[dict]:
         .head(3)
     )
 
-    return top_seasonal[["article_id", "product_type_name", "colour_group_name"]].to_dict(orient="records")
+    return top_seasonal[["article_id", "product_type_name", "colour_group_name", "index_name"]].to_dict(orient="records")
 
 # ==========================================
 # SKILL 2: Kaggle CLI Secure Bridge
@@ -122,14 +146,12 @@ def fetch_reference_images(article_ids: list[str]) -> str:
         folder = clean_id[:3]
         file_path = f"images/{folder}/{clean_id}.jpg"
         
-        # FIXED: Changed 'datasets' to 'competitions' and '-d' to '-c'
         command = [
             "kaggle", "competitions", "download", "-c", "h-and-m-personalized-fashion-recommendations", 
             "-f", file_path, "-p", output_dir
         ]
         
         try:
-            # Removed DEVNULL so you can see exact Kaggle permission errors if they happen
             subprocess.run(command, check=True) 
             downloaded.append(clean_id)
         except subprocess.CalledProcessError as e:
@@ -143,12 +165,11 @@ def fetch_reference_images(article_ids: list[str]) -> str:
 @tool("generate_seasonal_concepts", args_schema=ConceptDesignInput)
 def generate_seasonal_concepts(styles_context: list[dict], season: str) -> str:
     """Generates next-season AI fashion concepts using strong structural prompts."""
-    from pathlib import Path
-    print(f"\n[Design Agent] 🎨 Formulating {season} concept prompts (DRY RUN)...")
     
-    # ⚠️️ SET TO TRUE TO ACTUALLY GENERATE IMAGES. SET TO FALSE TO ONLY PRINT PROMPTS.
-    EXECUTE_API = False 
-
+    global AGENT_GENERATION_ENABLED, generator
+    
+    print(f"\n[Design Agent] 🎨 Formulating {season} concept prompts...")
+    
     season_modifiers = {
         "winter": "Heavyweight insulating fabrics, structured winter-ready construction.",
         "spring": "Lightweight breathable fabrics, clean transitional tailoring.",
@@ -157,16 +178,23 @@ def generate_seasonal_concepts(styles_context: list[dict], season: str) -> str:
     }
     modifier = season_modifiers.get(season.lower(), "High-quality construction.")
     
-    # Ensure generator is instantiated at the top of skills.py: generator = HFDiffusionConceptGenerator()
-    generator._output_dir = Path("images/task3/concepts")
+    if generator:
+        generator._output_dir = Path("images/task3/concepts")
+        concepts_dir = Path(generator._output_dir)
+    else:
+        concepts_dir = Path("images/task3/concepts")
+        
+    originals_dir = Path("images/task3/originals")
     
     saved_paths = []
     for item in styles_context:
         p_type = item.get("product_type_name", "Garment")
         color = item.get("colour_group_name", "Color")
+        demo = item.get("index_name", "General") 
+        article_id = str(item.get("article_id", "0000000000")).zfill(10)
+        
         ptype_lower = p_type.lower()
         
-        # Structural 3D Guardrails based on garment category
         if any(w in ptype_lower for w in ["top", "shirt", "blouse", "sweater", "cardigan", "hoodie", "jacket", "waistcoat", "vest", "t-shirt"]):
             cut = "featuring a realistic hollow 3D neck cavity showing the inside back of the collar, isolated upper-body garment"
         elif any(w in ptype_lower for w in ["trouser", "short", "legging", "skirt"]):
@@ -191,20 +219,29 @@ def generate_seasonal_concepts(styles_context: list[dict], season: str) -> str:
             "cropped, blurry, low quality, collage, storyboard."
         )
         
-        filename = f"agent_concept_{season.lower()}_{p_type.replace(' ', '_').lower()}_{color.replace(' ', '_').lower()}"
+        demo_clean = str(demo).lower().replace(',', '').replace('/', '_').replace(' ', '_')
+        color_clean = str(color).lower().replace(',', '').replace('/', '_').replace(' ', '_')
+        type_clean = str(p_type).lower().replace(',', '').replace('/', '_').replace(' ', '_')
         
-        if EXECUTE_API:
+        stakeholder_filename = f"{demo_clean}_{color_clean}_{type_clean}"
+        
+        target_original_path = originals_dir / f"{article_id}.jpg"
+        target_concept_path = concepts_dir / f"{stakeholder_filename}.png"
+        
+        print(f"\n--- DRY RUN: PROMPT FOR '{color} {p_type}' ---")
+        print(f"  > Reference Original: {target_original_path.as_posix()}")
+        print(f"  > Target Concept:     {target_concept_path.as_posix()}")
+        print(f"Positive: {prompt}")
+        print(f"Negative: {neg_prompt}")
+        
+        if AGENT_GENERATION_ENABLED and generator:
             try:
-                # Passes prompt, neg_prompt, and filename natively to the updated generator
-                out_path = generator.generate_concept(prompt, neg_prompt, filename) 
+                out_path = generator.generate_concept(prompt, neg_prompt, stakeholder_filename) 
                 saved_paths.append(str(out_path))
             except Exception as e:
                 print(f"  ❌ Error generating {p_type}: {e}")
         else:
-            print(f"\n--- DRY RUN: PROMPT FOR '{color} {p_type}' ---")
-            print(f"Positive: {prompt}")
-            print(f"Negative: {neg_prompt}")
-            saved_paths.append(f"dry_run_{filename}.png")
+            saved_paths.append(target_concept_path.as_posix())
             
-    status_msg = "Generated via API." if EXECUTE_API else "Dry run complete (no API consumed)."
+    status_msg = "Generated via API." if AGENT_GENERATION_ENABLED else "Dry run complete (no API consumed)."
     return f"Processed {len(saved_paths)} concepts. Mode: {status_msg}"

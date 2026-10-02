@@ -25,9 +25,7 @@ class SalesForecaster:
     Encapsulates the ML champion model artifacts for catalog-level
     predictions and distinct style assortment selection.
     """
-    # Columns required to ensure catalog diversity in Task 2 concepts
     _DIVERSITY_COLUMNS = ["product_type_name"]
-    # Internal name for unit prediction column
     _PRED_UNITS_COL = "predicted_30d_sales_volume"
 
     def __init__(self, models_dir: str | Path = "models"):

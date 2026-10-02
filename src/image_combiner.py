@@ -5,7 +5,6 @@ Combines seasonal concept images into a unified presentation board.
 from pathlib import Path
 from PIL import Image
 
-
 class ConceptImageCombiner:
     """Stitches individual garment renders into a horizontal presentation board."""
 
@@ -17,38 +16,43 @@ class ConceptImageCombiner:
         self,
         input_dir: str | Path,
         output_file: str | Path,
-        season: str,
+        season: str = None,
         expected_count: int = 3
     ) -> Path | None:
         """
-        Combines concept images matching a season prefix.
+        Combines concept images from the target directory.
         Gracefully handles missing files without crashing.
         """
         in_path = Path(input_dir)
         out_path = Path(output_file)
 
         if not in_path.exists():
-            print(f"[ImageCombiner] ⚠️ Warning: Directory '{in_path}' does not exist. Skipping image stitching.")
+            print(f"[ImageCombiner] ⚠️ Warning: Directory '{in_path}' does not exist. Stitching skipped.")
             return None
 
-        # Filter strictly by season prefix and valid image extensions
+        # Filter for valid image extensions
         valid_exts = {".png", ".jpg", ".jpeg"}
-        season_prefix = f"agent_concept_{season.strip().lower()}_"
         
-        matched_files = sorted([
+        valid_files = [
             f for f in in_path.iterdir()
-            if f.is_file() and f.suffix.lower() in valid_exts and f.name.startswith(season_prefix)
-        ])
+            if f.is_file() and f.suffix.lower() in valid_exts
+        ]
 
-        if not matched_files:
-            print(f"[ImageCombiner] ⚠️ No concept images found matching prefix '{season_prefix}' in '{in_path}'. Stitching skipped.")
+        if not valid_files:
+            print(f"[ImageCombiner] ⚠️ No concept images found in '{in_path}'. Stitching skipped.")
             return None
+
+        # Sort by modification time descending to grab the most recently generated batch
+        valid_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        matched_files = valid_files[:expected_count]
+
+        # Re-sort alphabetically so the visual board order remains consistent left-to-right
+        matched_files.sort(key=lambda x: x.name)
 
         if len(matched_files) < expected_count:
-            print(f"[ImageCombiner] ⚠️ Found {len(matched_files)} image(s) for season '{season}', expected {expected_count}. Proceeding with available images.")
+            print(f"[ImageCombiner] ⚠️ Found {len(matched_files)} image(s), expected {expected_count}. Proceeding with available images.")
 
-        images_to_combine = matched_files[:expected_count]
-        loaded_images = [Image.open(p) for p in images_to_combine]
+        loaded_images = [Image.open(p) for p in matched_files]
 
         widths, heights = zip(*(img.size for img in loaded_images))
         total_width = sum(widths) + (self.padding * (len(loaded_images) + 1))
@@ -70,4 +74,4 @@ class ConceptImageCombiner:
 if __name__ == "__main__":
     combiner = ConceptImageCombiner()
     # Example for Task 2:
-    # combiner.combine("images/task2/concepts", "images/task2/final_concept_presentation.png")
+    # combiner.combine_seasonal_concepts("images/task2/concepts", "images/task2/final_concepts_presentation.png")

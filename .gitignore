@@ -18,9 +18,6 @@ data/
 
 
 # Generated Outputs & Images
-images/
-!images/.gitkeep
-!images/generated_concepts/.gitkeep
 agent_architecture_graph.png
 
 # OS generated files

@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
 
-API_BASE_URL = "http://localhost:8000"
+# API_BASE_URL = "http://localhost:8000"
+
+API_BASE_URL = "https://ai-fashion-design-pipeline.onrender.com"
 
 st.set_page_config(page_title="MerchMix AI", layout="wide")
 

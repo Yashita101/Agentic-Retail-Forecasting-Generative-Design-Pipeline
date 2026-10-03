@@ -13,7 +13,7 @@ venv/
 .ipynb_checkpoints/
 
 # Heavy Data (Kaggle datasets, parquet, csv)
-data/
+data/raw/
 !data/.gitkeep
 
 

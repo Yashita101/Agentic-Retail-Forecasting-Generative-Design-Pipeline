@@ -3,6 +3,12 @@
 ## Overview
 This project is an automated pipeline for the retail fashion industry. It uses machine learning to predict top-selling items from historical transaction data, and an AI agent workflow to generate visual prototypes for the next season. 
 
+### 🟢 Live Demo
+You can access the deployed application here:
+* **Frontend :** [ai-fashion-design-pipeline.streamlit.app](https://ai-fashion-design-pipeline.streamlit.app/)
+* **Backend API :** [ai-fashion-design-pipeline.onrender.com/docs](https://ai-fashion-design-pipeline.onrender.com/docs)
+*(Note: Because these are hosted on free-tier services, the apps may take ~60s to wake up if inactive).*
+
 ## System Architecture
 
 ![Agent Architecture](https://github.com/user-attachments/assets/7749bc21-2e16-42a4-a0e7-7a9fd95e28b1)

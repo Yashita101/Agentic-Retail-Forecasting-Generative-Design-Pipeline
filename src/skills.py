@@ -4,7 +4,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 from src.forecaster import SalesForecaster
-from src.concept_generator import HFDiffusionConceptGenerator
+from src.concept_generator import HFDiffusionConceptGenerator, build_sdxl_prompt
 from pathlib import Path
 
 # --- GRACEFUL INITIALIZATION & DRY RUN SAFETY NET ---
@@ -170,14 +170,6 @@ def generate_seasonal_concepts(styles_context: list[dict], season: str) -> str:
     
     print(f"\n[Design Agent] 🎨 Formulating {season} concept prompts...")
     
-    season_modifiers = {
-        "winter": "Heavyweight insulating fabrics, structured winter-ready construction.",
-        "spring": "Lightweight breathable fabrics, clean transitional tailoring.",
-        "summer": "Airy open-weave fabric, fluid relaxed hot-weather drape.",
-        "autumn": "Mid-weight textured twill, rich earthy layered styling."
-    }
-    modifier = season_modifiers.get(season.lower(), "High-quality construction.")
-    
     if generator:
         generator._output_dir = Path("images/task3/concepts")
         concepts_dir = Path(generator._output_dir)
@@ -193,30 +185,10 @@ def generate_seasonal_concepts(styles_context: list[dict], season: str) -> str:
         demo = item.get("index_name", "General") 
         article_id = str(item.get("article_id", "0000000000")).zfill(10)
         
-        ptype_lower = p_type.lower()
-        
-        if any(w in ptype_lower for w in ["top", "shirt", "blouse", "sweater", "cardigan", "hoodie", "jacket", "waistcoat", "vest", "t-shirt"]):
-            cut = "featuring a realistic hollow 3D neck cavity showing the inside back of the collar, isolated upper-body garment"
-        elif any(w in ptype_lower for w in ["trouser", "short", "legging", "skirt"]):
-            cut = "featuring a realistic hollow 3D open waistband cavity, isolated lower-body garment"
-        elif any(w in ptype_lower for w in ["dress", "jumpsuit"]):
-            cut = "featuring a realistic hollow 3D neck cavity, full-length isolated garment"
-        else:
-            cut = "featuring a hollow 3D opening, isolated single garment"
-            
-        prompt = (
-            f"Commercial e-commerce product catalog shot of exactly ONE single isolated {color} {p_type}. "
-            f"Strictly displayed on an invisible ghost mannequin, {cut}, centered front-facing view. "
-            f"Basic commercial design modification with subtle refined stitching, preserving the original {p_type} silhouette exactly. "
-            f"{modifier} High fashion commercial studio lighting, neutral light-grey backdrop, 8k resolution, photorealistic clothing item. "
-            f"THIS IS A 3D GARMENT, NOT A FLAT PATTERN."
-        )
-        
-        neg_prompt = (
-            "ABSOLUTELY NO HUMAN MODEL, no face, no skin, no hands, no arms, no legs, no physical body inside the garment, "
-            "no mannequin head, no hanger. fabric swatch, seamless pattern, wallpaper, flat 2d design, background texture, "
-            "macro shot, close up, sketch, drawing, illustration, cartoon, 3d render, multiple views, multiple items, "
-            "cropped, blurry, low quality, collage, storyboard."
+        prompt, neg_prompt = build_sdxl_prompt(
+            product_type=p_type,
+            color=color,
+            season=season
         )
         
         demo_clean = str(demo).lower().replace(',', '').replace('/', '_').replace(' ', '_')

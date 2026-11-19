@@ -27,6 +27,7 @@ jobs:
 
     - name: Run Agentic Flow Test Suite
       env:
+        PYTHONPATH: .
         OPENAI_API_KEY: "sk-mock-testing-key-for-ci"
         HF_TOKEN: "hf-mock-testing-key-for-ci"
         TASK_3_ENABLED: "False"
